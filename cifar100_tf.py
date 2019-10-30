@@ -73,7 +73,9 @@ block4 = block(block3, 64, 64, 2) #  8 -> 4
 pool   = tf.nn.avg_pool(block4, ksize=[1,4,4,1], strides=[1,4,4,1], padding='SAME') # 4 -> 1
 flat   = tf.reshape(pool, [1, 64])
 route  = tf.squeeze(dense(flat, [64, 20]))
-idx    = tf.cast(tf.argmax(route), dtype=tf.int32)
+
+train_idx = tf.squeeze(tf.distributions.Categorical(logits=route).sample(1))
+test_idx = tf.cast(tf.argmax(route), dtype=tf.int32)
 
 ####################################
 
@@ -95,18 +97,19 @@ branch_fns = {}
 for e in range(20):
     branch_fns[e] = lambda: experts[e]
 
-out = tf.switch_case(branch_index=idx, branch_fns=branch_fns)
+train_out = tf.switch_case(branch_index=train_idx, branch_fns=branch_fns)
+test_out = tf.switch_case(branch_index=test_idx, branch_fns=branch_fns)
 
 ####################################
 
-correct = tf.equal(tf.argmax(out, axis=1), tf.argmax(y, 1))
+correct = tf.equal(tf.argmax(test_out, axis=1), tf.argmax(y, 1))
 sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
 
-loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=out)
+loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=train_out)
 params = tf.trainable_variables()
 grads = tf.gradients(loss, params)
 grads_and_vars = zip(grads, params)
-train = tf.train.AdamOptimizer(learning_rate=1e-2, epsilon=1.).apply_gradients(grads_and_vars)
+train = tf.train.AdamOptimizer(learning_rate=1e-1, epsilon=1.).apply_gradients(grads_and_vars)
 
 ####################################
 
@@ -118,23 +121,25 @@ sess.run(tf.global_variables_initializer())
 ####################################
 
 for ii in range(epochs):
-    for jj in range(0, 50000, batch_size):
-        if ((jj+1) % 1000 == 0):
-            print ('%d/%d' % (jj+1, 50000))
 
+    idxs = [0] * 20
+    for jj in range(0, 50000, batch_size):
         xs = np.reshape(x_train[jj], (1, 32, 32, 3))
         ys = np.reshape(y_train[jj], (1, 100))
-        sess.run([train], feed_dict={x: xs, y: ys})     
-    
+        [i, _] = sess.run([train_idx, train], feed_dict={x: xs, y: ys})     
+        idxs[i] += 1 
+        if ((jj+1) % 1000 == 0):
+            print ('%d/%d' % (jj+1, 50000))    
+            print (idxs)
+
     total_correct = 0
     for jj in range(0, 10000, batch_size):
-        if ((jj+1) % 1000 == 0):
-            print ('%d/%d' % (jj+1, 10000))
-
         xs = np.reshape(x_test[jj], (1, 32, 32, 3))
         ys = np.reshape(y_test[jj], (1, 100))
         _sum_correct = sess.run(sum_correct, feed_dict={x: xs, y: ys})
         total_correct += _sum_correct
+        if ((jj+1) % 1000 == 0):
+            print ('%d/%d' % (jj+1, 10000))
 
     '''
     param = sess.run(params, feed_dict={})
