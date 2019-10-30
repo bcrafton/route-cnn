@@ -115,7 +115,7 @@ sess.run(tf.global_variables_initializer())
 
 for ii in range(epochs):
     for jj in range(0, 50000, batch_size):
-        s = jj
+        print (jj)
         xs = np.reshape(x_train[jj], (1, 32, 32, 3))
         ys = np.reshape(y_train[jj], (1, 10))
         sess.run([train], feed_dict={x: xs, y: ys})     
