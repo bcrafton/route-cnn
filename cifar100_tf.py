@@ -35,6 +35,9 @@ y = tf.placeholder(tf.float32, [None, 100])
 
 ####################################
 
+# TODO: can train with batches, just pick an idx they can all go down.
+# mode 
+
 def batch_norm(x, f):
     gamma = tf.Variable(np.ones(shape=f), dtype=tf.float32)
     beta = tf.Variable(np.zeros(shape=f), dtype=tf.float32)
@@ -81,13 +84,13 @@ test_idx = tf.cast(tf.argmax(route), dtype=tf.int32)
 
 experts = []
 for e in range(20):
-    expert_block1 = block(block3,        64, 64, 1) # 8 -> 8
-    expert_block2 = block(expert_block1, 64, 64, 2) # 8 -> 4
-    expert_block3 = block(expert_block2, 64, 64, 1) # 4 -> 4
+    expert_block1 = block(block3,         64, 128, 1) # 8 -> 8
+    expert_block2 = block(expert_block1, 128, 256, 1) # 8 -> 8
+    expert_block3 = block(expert_block2, 256, 256, 2) # 8 -> 4
 
     pool  = tf.nn.avg_pool(expert_block3, ksize=[1,4,4,1], strides=[1,4,4,1], padding='SAME') # 4 -> 1
-    flat  = tf.reshape(pool, [1, 64])
-    pred  = dense(flat, [64, 100])
+    flat  = tf.reshape(pool, [1, 256])
+    pred  = dense(flat, [256, 100])
     
     experts.append(pred)
 
