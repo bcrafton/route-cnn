@@ -91,12 +91,11 @@ for e in range(4):
 
 ####################################
 
-def f0(): return experts[0]
-def f1(): return experts[1]
-def f2(): return experts[2]
-def f3(): return experts[3]
+branch_fns = {}
+for e in range(4):
+    branch_fns[e] = lambda: experts[e]
 
-out = tf.switch_case(branch_index=idx, branch_fns={0: f0, 1: f1, 2: f2, 3: f3})
+out = tf.switch_case(branch_index=idx, branch_fns=branch_fns)
 
 ####################################
 
