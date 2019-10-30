@@ -35,7 +35,7 @@ y = tf.placeholder(tf.float32, [None, 10])
 
 ####################################
 
-def batch_norm(x, f, name):
+def batch_norm(x, f):
     gamma = tf.Variable(np.ones(shape=f), dtype=tf.float32)
     beta = tf.Variable(np.zeros(shape=f), dtype=tf.float32)
 
@@ -45,16 +45,16 @@ def batch_norm(x, f, name):
     bn = tf.nn.batch_normalization(x=x, mean=mean, variance=var, offset=beta, scale=gamma, variance_epsilon=1e-3)
     return bn
 
-def block(x, f1, f2, p, name):
+def block(x, f1, f2, p):
     filters = tf.Variable(init_filters(size=[3,3,f1,f2], init='alexnet'), dtype=tf.float32)
 
     conv = tf.nn.conv2d(x, filters, [1,1,1,1], 'SAME')
-    bn   = batch_norm(conv, f2, name+'_bn1')
+    bn   = batch_norm(conv, f2)
     relu = tf.nn.relu(bn)
     pool = tf.nn.avg_pool(relu, ksize=[1,p,p,1], strides=[1,p,p,1], padding='SAME')
     return pool
 
-def dense(x, size, name):
+def dense(x, size):
     input_size, output_size = size
 
     w = tf.Variable(init_matrix(size=size, init='alexnet'), dtype=tf.float32)
@@ -65,27 +65,27 @@ def dense(x, size, name):
 
 ####################################
 
-block1 = block(x,       3, 32, 2, 'block1') # 32 -> 16
-block2 = block(block1, 32, 64, 2, 'block2') # 16 -> 8
-block3 = block(block2, 64, 64, 1, 'block3') #  8 -> 8
+block1 = block(x,       3, 32, 2) # 32 -> 16
+block2 = block(block1, 32, 64, 2) # 16 -> 8
+block3 = block(block2, 64, 64, 1) #  8 -> 8
 
-block4 = block(block3, 64, 64, 2, 'block4') #  8 -> 4
+block4 = block(block3, 64, 64, 2) #  8 -> 4
 pool   = tf.nn.avg_pool(block4, ksize=[1,4,4,1], strides=[1,4,4,1], padding='SAME') # 4 -> 1
 flat   = tf.reshape(pool, [1, 64])
-route  = tf.squeeze(dense(flat, [64, 4], 'fc1'))
+route  = tf.squeeze(dense(flat, [64, 4]))
 idx    = tf.cast(tf.argmax(route), dtype=tf.int32)
 
 ####################################
 
 experts = []
 for e in range(4):
-    expert_block1 = block(block3,        64, 64, 1, 'block1') # 8 -> 8
-    expert_block2 = block(expert_block1, 64, 64, 2, 'block2') # 8 -> 4
-    expert_block3 = block(expert_block2, 64, 64, 1, 'block3') # 4 -> 4
+    expert_block1 = block(block3,        64, 64, 1) # 8 -> 8
+    expert_block2 = block(expert_block1, 64, 64, 2) # 8 -> 4
+    expert_block3 = block(expert_block2, 64, 64, 1) # 4 -> 4
 
     pool  = tf.nn.avg_pool(expert_block3, ksize=[1,4,4,1], strides=[1,4,4,1], padding='SAME') # 4 -> 1
     flat  = tf.reshape(pool, [1, 64])
-    pred  = dense(flat, [64, 10], 'fc1')
+    pred  = dense(flat, [64, 10])
     
     experts.append(pred)
 
