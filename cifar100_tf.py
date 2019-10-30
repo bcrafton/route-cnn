@@ -85,7 +85,7 @@ for e in range(20):
 
     pool  = tf.nn.avg_pool(expert_block3, ksize=[1,4,4,1], strides=[1,4,4,1], padding='SAME') # 4 -> 1
     flat  = tf.reshape(pool, [1, 64])
-    pred  = dense(flat, [64, 5])
+    pred  = dense(flat, [64, 100])
     
     experts.append(pred)
 
@@ -99,13 +99,10 @@ out = tf.switch_case(branch_index=idx, branch_fns=branch_fns)
 
 ####################################
 
-label     = tf.reshape(y, [20, 1, 5])
-label_sel = label[idx]
-
-correct = tf.equal(tf.argmax(out, axis=1), tf.argmax(label_sel, 1))
+correct = tf.equal(tf.argmax(out, axis=1), tf.argmax(y, 1))
 sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
 
-loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=label_sel, logits=out)
+loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=out)
 params = tf.trainable_variables()
 grads = tf.gradients(loss, params)
 grads_and_vars = zip(grads, params)
