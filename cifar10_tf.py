@@ -89,19 +89,20 @@ for e in range(4):
 
 ####################################
 
-'''
-def f0(): return block1
-def f1(): return tf.zeros_like(block1)
-def f2(): return tf.ones_like(block1)
-def f3(): return block1
-'''
-
 def f0(): return experts[0]
 def f1(): return experts[1]
 def f2(): return experts[2]
 def f3(): return experts[3]
 
 out = tf.switch_case(branch_index=idx, branch_fns={0: f0, 1: f1, 2: f2, 3: f3})
+
+####################################
+
+loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=out)
+params = tf.trainable_variables()
+grads = tf.gradients(loss, params)
+grads_and_vars = zip(grads, params)
+train = tf.train.AdamOptimizer(learning_rate=1e-2, epsilon=1.).apply_gradients(grads_and_vars)
 
 ####################################
 
@@ -117,10 +118,7 @@ for ii in range(epochs):
         s = jj
         xs = np.reshape(x_train[jj], (1, 32, 32, 3))
         ys = np.reshape(y_train[jj], (1, 10))
-        [r, o] = sess.run([route, out], feed_dict={x: xs, y: ys})
-        # print (np.shape(r), np.shape(o))      
-        # print (r, o)
-        print (o)      
+        sess.run([train], feed_dict={x: xs, y: ys})     
 
     '''
     # total_correct = 0
