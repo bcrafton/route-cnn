@@ -36,8 +36,8 @@ y = tf.placeholder(tf.float32, [None, 10])
 ####################################
 
 def batch_norm(x, f, name):
-    gamma = tf.Variable(np.ones(shape=f), dtype=tf.float32, name=name+'_gamma')
-    beta = tf.Variable(np.zeros(shape=f), dtype=tf.float32, name=name+'_beta')
+    gamma = tf.Variable(np.ones(shape=f), dtype=tf.float32)
+    beta = tf.Variable(np.zeros(shape=f), dtype=tf.float32)
 
     mean = tf.reduce_mean(x, axis=[0,1,2])
     _, var = tf.nn.moments(x - mean, axes=[0,1,2])
@@ -46,7 +46,7 @@ def batch_norm(x, f, name):
     return bn
 
 def block(x, f1, f2, p, name):
-    filters = tf.Variable(init_filters(size=[3,3,f1,f2], init='alexnet'), dtype=tf.float32, name=name+'_conv')
+    filters = tf.Variable(init_filters(size=[3,3,f1,f2], init='alexnet'), dtype=tf.float32)
 
     conv = tf.nn.conv2d(x, filters, [1,1,1,1], 'SAME')
     bn   = batch_norm(conv, f2, name+'_bn1')
@@ -57,8 +57,8 @@ def block(x, f1, f2, p, name):
 def dense(x, size, name):
     input_size, output_size = size
 
-    w = tf.Variable(init_matrix(size=size, init='alexnet'), dtype=tf.float32, name=name)
-    b  = tf.Variable(np.zeros(shape=output_size), dtype=tf.float32, name=name+'_bias')
+    w = tf.Variable(init_matrix(size=size, init='alexnet'), dtype=tf.float32)
+    b  = tf.Variable(np.zeros(shape=output_size), dtype=tf.float32)
 
     fc = tf.matmul(x, w) + b
     return fc
@@ -79,13 +79,13 @@ idx    = tf.cast(tf.argmax(route), dtype=tf.int32)
 
 experts = []
 for e in range(4):
-    expert_block1 = block(block3,        64, 16, 1, 'block1') # 8 -> 8
-    expert_block2 = block(expert_block1, 16, 16, 2, 'block2') # 8 -> 4
-    expert_block3 = block(expert_block2, 16, 16, 1, 'block3') # 4 -> 4
+    expert_block1 = block(block3,        64, 64, 1, 'block1') # 8 -> 8
+    expert_block2 = block(expert_block1, 64, 64, 2, 'block2') # 8 -> 4
+    expert_block3 = block(expert_block2, 64, 64, 1, 'block3') # 4 -> 4
 
     pool  = tf.nn.avg_pool(expert_block3, ksize=[1,4,4,1], strides=[1,4,4,1], padding='SAME') # 4 -> 1
-    flat  = tf.reshape(pool, [1, 16])
-    pred  = dense(flat, [16, 10], 'fc1')
+    flat  = tf.reshape(pool, [1, 64])
+    pred  = dense(flat, [64, 10], 'fc1')
     
     experts.append(pred)
 
