@@ -38,8 +38,10 @@ y = tf.placeholder(tf.float32, [None, 10])
 def batch_norm(x, f, name):
     gamma = tf.Variable(np.ones(shape=f), dtype=tf.float32, name=name+'_gamma')
     beta = tf.Variable(np.zeros(shape=f), dtype=tf.float32, name=name+'_beta')
+
     mean = tf.reduce_mean(x, axis=[0,1,2])
     _, var = tf.nn.moments(x - mean, axes=[0,1,2])
+
     bn = tf.nn.batch_normalization(x=x, mean=mean, variance=var, offset=beta, scale=gamma, variance_epsilon=1e-3)
     return bn
 
@@ -49,15 +51,15 @@ def block(x, f1, f2, p, name):
     conv = tf.nn.conv2d(x, filters, [1,1,1,1], 'SAME')
     bn   = batch_norm(conv, f2, name+'_bn1')
     relu = tf.nn.relu(bn)
-
     pool = tf.nn.avg_pool(relu, ksize=[1,p,p,1], strides=[1,p,p,1], padding='SAME')
-
     return pool
 
 def dense(x, size, name):
     input_size, output_size = size
+
     w = tf.Variable(init_matrix(size=size, init='alexnet'), dtype=tf.float32, name=name)
     b  = tf.Variable(np.zeros(shape=output_size), dtype=tf.float32, name=name+'_bias')
+
     fc = tf.matmul(x, w) + b
     return fc
 
@@ -98,6 +100,10 @@ out = tf.switch_case(branch_index=idx, branch_fns={0: f0, 1: f1, 2: f2, 3: f3})
 
 ####################################
 
+predict = tf.argmax(out, axis=1)
+correct = tf.equal(predict, tf.argmax(y, 1))
+sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
+
 loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=out)
 params = tf.trainable_variables()
 grads = tf.gradients(loss, params)
@@ -115,22 +121,22 @@ sess.run(tf.global_variables_initializer())
 
 for ii in range(epochs):
     for jj in range(0, 50000, batch_size):
-        print (jj)
+        if ((jj+1) % 1000 == 0):
+            print ('%d/%d' % (jj+1, 50000))
+
         xs = np.reshape(x_train[jj], (1, 32, 32, 3))
         ys = np.reshape(y_train[jj], (1, 10))
         sess.run([train], feed_dict={x: xs, y: ys})     
-
-    '''
-    # total_correct = 0
-
+    
+    total_correct = 0
     for jj in range(0, 10000, batch_size):
-        s = jj
-        e = jj + batch_size
-        xs = x_test[s:e]
-        ys = y_test[s:e]
+        if ((jj+1) % 1000 == 0):
+            print ('%d/%d' % (jj+1, 10000))
+
+        xs = np.reshape(x_test[jj], (1, 32, 32, 3))
+        ys = np.reshape(y_test[jj], (1, 10))
         _sum_correct = sess.run(sum_correct, feed_dict={x: xs, y: ys})
         total_correct += _sum_correct
-    '''
 
     '''
     param = sess.run(params, feed_dict={})
@@ -141,9 +147,7 @@ for ii in range(epochs):
     np.save('cifar10_weights', param)       
     '''
   
-    '''
     print ("acc: " + str(total_correct * 1.0 / 10000))
-    ''' 
         
 ####################################
 
