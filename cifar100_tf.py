@@ -36,7 +36,7 @@ y = tf.placeholder(tf.float32, [None, 100])
 ####################################
 
 # TODO: can train with batches, just pick an idx they can all go down.
-# mode 
+# sum along batch index...
 
 def batch_norm(x, f):
     gamma = tf.Variable(np.ones(shape=f), dtype=tf.float32)
@@ -77,7 +77,9 @@ pool   = tf.nn.avg_pool(block4, ksize=[1,4,4,1], strides=[1,4,4,1], padding='SAM
 flat   = tf.reshape(pool, [1, 64])
 route  = tf.squeeze(dense(flat, [64, 20]))
 
-train_idx = tf.squeeze(tf.distributions.Categorical(logits=route).sample(1))
+pi = tf.distributions.Categorical(logits=route)
+train_idx = tf.squeeze(pi.sample(1))
+
 test_idx = tf.cast(tf.argmax(route), dtype=tf.int32)
 
 ####################################
@@ -108,7 +110,10 @@ test_out = tf.switch_case(branch_index=test_idx, branch_fns=branch_fns)
 correct = tf.equal(tf.argmax(test_out, axis=1), tf.argmax(y, 1))
 sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
 
-loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=train_out)
+entropy_loss = -tf.reduce_mean(pi.entropy())
+class_loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=train_out)
+loss = class_loss + entropy_loss
+
 params = tf.trainable_variables()
 grads = tf.gradients(loss, params)
 grads_and_vars = zip(grads, params)
