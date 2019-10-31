@@ -69,11 +69,10 @@ def dense(x, size):
 ####################################
 
 block1 = block(x,       3, 32, 2) # 32 -> 16
-block2 = block(block1, 32, 64, 2) # 16 -> 8
-block3 = block(block2, 64, 64, 1) #  8 -> 8
+block2 = block(block1, 32, 64, 2) # 16 ->  8
+block3 = block(block2, 64, 64, 2) #  8 ->  4
 
-block4 = block(block3, 64, 64, 2) #  8 -> 4
-pool   = tf.nn.avg_pool(block4, ksize=[1,4,4,1], strides=[1,4,4,1], padding='SAME') # 4 -> 1
+pool   = tf.nn.avg_pool(block3, ksize=[1,4,4,1], strides=[1,4,4,1], padding='SAME') # 4 -> 1
 flat   = tf.reshape(pool, [1, 64])
 route  = tf.squeeze(dense(flat, [64, 20]))
 
@@ -86,9 +85,9 @@ test_idx = tf.cast(tf.argmax(route), dtype=tf.int32)
 
 experts = []
 for e in range(20):
-    expert_block1 = block(block3,         64, 128, 1) # 8 -> 8
-    expert_block2 = block(expert_block1, 128, 256, 1) # 8 -> 8
-    expert_block3 = block(expert_block2, 256, 256, 2) # 8 -> 4
+    expert_block1 = block(x,               3,  64, 2) # 32 -> 16
+    expert_block2 = block(expert_block1,  64, 128, 2) # 16 ->  8
+    expert_block3 = block(expert_block2, 128, 256, 2) #  8 ->  4
 
     pool  = tf.nn.avg_pool(expert_block3, ksize=[1,4,4,1], strides=[1,4,4,1], padding='SAME') # 4 -> 1
     flat  = tf.reshape(pool, [1, 256])
@@ -153,7 +152,7 @@ for ii in range(epochs):
     param = sess.run(params, feed_dict={})
 
     for p in param:
-      print (np.shape(p))
+        print (np.shape(p))
 
     np.save('cifar10_weights', param)       
     '''
