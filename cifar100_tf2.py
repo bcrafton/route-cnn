@@ -142,10 +142,10 @@ def route_block(x, nexpert, nidx, route, expert):
 ####################################
 
 x1 = x
-train_out1, test_out1, pi1, _, _ = route_block(x=x1, nexpert=20, nidx=4, route=[[3, 64, 2], [64, 64, 2], [64, 64, 2], [64, 64, 4]], expert=[[3, 64, 2], [64, 64, 1], [64, 64, 1], [64, 64, 1]])
+train_out1, test_out1, pi1, train_idx1, test_idx1 = route_block(x=x1, nexpert=20, nidx=4, route=[[3, 64, 2], [64, 64, 2], [64, 64, 2], [64, 64, 4]], expert=[[3, 64, 2], [64, 64, 1], [64, 64, 1], [64, 64, 1]])
 
 x2 = tf.switch_case(branch_index=train_flag, branch_fns={0: lambda: test_out1, 1: lambda: train_out1})
-train_out2, test_out2, pi2, _, _ = route_block_pred(x=x2, nexpert=20, route=[[64, 64, 1], [64, 64, 2], [64, 64, 2], [64, 64, 4]], expert=[[64, 64, 1], [64, 64, 2], [64, 64, 2], [64, 64, 4]])
+train_out2, test_out2, pi2, train_idx2, test_idx2 = route_block_pred(x=x2, nexpert=20, route=[[64, 64, 1], [64, 64, 2], [64, 64, 2], [64, 64, 4]], expert=[[64, 64, 1], [64, 64, 2], [64, 64, 2], [64, 64, 4]])
 
 ####################################
 
@@ -172,29 +172,29 @@ sess.run(tf.global_variables_initializer())
 
 for ii in range(epochs):
 
-    idxs = [0] * 20
+    # idxs = [0] * 20
     for jj in range(0, 50000, batch_size):
         xs = np.reshape(x_train[jj], (1, 32, 32, 3))
         ys = np.reshape(y_train[jj], (1, 100))
-        [_] = sess.run([train], feed_dict={x: xs, y: ys, train_flag: 1})     
+        [_, i1, i2] = sess.run([train, train_idx1, train_idx2], feed_dict={x: xs, y: ys, train_flag: 1})     
         # idxs[i] += 1 
-        # print (i)
+        # print (i1, i2)
         if ((jj+1) % 1000 == 0):
             print ('%d/%d' % (jj+1, 50000))    
-            print (idxs)
+            # print (idxs)
 
-    idxs = [0] * 20
+    # idxs = [0] * 20
     total_correct = 0
     for jj in range(0, 10000, batch_size):
         xs = np.reshape(x_test[jj], (1, 32, 32, 3))
         ys = np.reshape(y_test[jj], (1, 100))
-        [i_sum_correct] = sess.run([sum_correct], feed_dict={x: xs, y: ys, train_flag: 0})
+        [_sum_correct, i1, i2] = sess.run([sum_correct, test_idx1, test_idx2], feed_dict={x: xs, y: ys, train_flag: 0})
         # idxs[i] += 1 
-        # print (i)
+        # print (i1, i2)
         total_correct += _sum_correct
         if ((jj+1) % 1000 == 0):
             print ('%d/%d' % (jj+1, 10000))
-            print (idxs)
+            # print (idxs)
 
     '''
     param = sess.run(params, feed_dict={})
