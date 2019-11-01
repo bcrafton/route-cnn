@@ -1,7 +1,7 @@
 
 import os
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]='0'
+os.environ["CUDA_VISIBLE_DEVICES"]='1'
 
 ####################################
 
@@ -145,16 +145,17 @@ x1 = x
 train_out1, test_out1, pi1, train_idx1, test_idx1 = route_block(x=x1, nexpert=20, nidx=4, route=[[3, 64, 2], [64, 64, 2], [64, 64, 2], [64, 64, 4]], expert=[[3, 64, 2], [64, 64, 1], [64, 64, 1], [64, 64, 1]])
 
 x2 = tf.switch_case(branch_index=train_flag, branch_fns={0: lambda: test_out1, 1: lambda: train_out1})
-train_out2, test_out2, pi2, train_idx2, test_idx2 = route_block_pred(x=x2, nexpert=20, route=[[64, 64, 1], [64, 64, 2], [64, 64, 2], [64, 64, 4]], expert=[[64, 64, 1], [64, 64, 2], [64, 64, 2], [64, 64, 4]])
+train_out2, test_out2, pi2, train_idx2, test_idx2 = route_block_pred(x=x2, nexpert=20, route=[[256, 256, 1], [256, 256, 2], [256, 256, 2], [256, 256, 4]], expert=[[256, 256, 1], [256, 256, 2], [256, 256, 2], [256, 256, 4]])
 
 ####################################
 
 correct = tf.equal(tf.argmax(test_out2, axis=1), tf.argmax(y, 1))
 sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
 
-entropy_loss = -tf.reduce_mean(pi1.entropy()) + -tf.reduce_mean(pi2.entropy())
+entropy_loss1 = -tf.reduce_mean(pi1.entropy())
+entropy_loss2 = -tf.reduce_mean(pi2.entropy())
 class_loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=train_out2)
-loss = class_loss + entropy_loss
+loss = (1. * class_loss) + (5. * entropy_loss1) + (0.5 * entropy_loss2)
 
 params = tf.trainable_variables()
 grads = tf.gradients(loss, params)
@@ -172,46 +173,68 @@ sess.run(tf.global_variables_initializer())
 
 for ii in range(epochs):
 
-    # idxs = [0] * 20
+    idx1 = [0] * 20
+    idx2 = [0] * 20
     for jj in range(0, 50000, batch_size):
         xs = np.reshape(x_train[jj], (1, 32, 32, 3))
         ys = np.reshape(y_train[jj], (1, 100))
-        [_, i1, i2] = sess.run([train, train_idx1, train_idx2], feed_dict={x: xs, y: ys, train_flag: 1})     
-        # idxs[i] += 1 
-        # print (i1, i2)
+        [_, out1, out2, i1, i2] = sess.run([train, train_out1, train_out2, train_idx1, train_idx2], feed_dict={x: xs, y: ys, train_flag: 1}) 
+
+        idx2[i2] += 1 
+        for i in i1:
+            idx1[i] += 1
+
         if ((jj+1) % 1000 == 0):
             print ('%d/%d' % (jj+1, 50000))    
-            # print (idxs)
+            print (idx1, idx2)
+            # print (np.shape(out1), np.shape(out2), i1, i2)
 
-    # idxs = [0] * 20
+    idx1 = [0] * 20
+    idx2 = [0] * 20
     total_correct = 0
     for jj in range(0, 10000, batch_size):
         xs = np.reshape(x_test[jj], (1, 32, 32, 3))
         ys = np.reshape(y_test[jj], (1, 100))
-        [_sum_correct, i1, i2] = sess.run([sum_correct, test_idx1, test_idx2], feed_dict={x: xs, y: ys, train_flag: 0})
-        # idxs[i] += 1 
-        # print (i1, i2)
+        [_sum_correct, out1, out2, i1, i2] = sess.run([sum_correct, test_out1, test_out2, test_idx1, test_idx2], feed_dict={x: xs, y: ys, train_flag: 0})
+
+        idx2[i2] += 1 
+        for i in i1:
+            idx1[i] += 1
+
         total_correct += _sum_correct
         if ((jj+1) % 1000 == 0):
             print ('%d/%d' % (jj+1, 10000))
-            # print (idxs)
+            print (idx1, idx2)
+            # print (np.shape(out1), np.shape(out2), i1, i2)
 
-    '''
-    param = sess.run(params, feed_dict={})
-
-    for p in param:
-        print (np.shape(p))
-
-    np.save('cifar10_weights', param)       
-    '''
-  
     print ("acc: " + str(total_correct * 1.0 / 10000))
+
         
 ####################################
+'''
+for ii in range(epochs):
 
+    for jj in range(0, 50000, batch_size):
+        xs = np.reshape(x_train[jj], (1, 32, 32, 3))
+        ys = np.reshape(y_train[jj], (1, 100))
+        [_] = sess.run([train], feed_dict={x: xs, y: ys, train_flag: 1}) 
 
+        if ((jj+1) % 1000 == 0):
+            print ('%d/%d' % (jj+1, 50000))
 
+    total_correct = 0
+    for jj in range(0, 10000, batch_size):
+        xs = np.reshape(x_test[jj], (1, 32, 32, 3))
+        ys = np.reshape(y_test[jj], (1, 100))
+        [_sum_correct] = sess.run([sum_correct], feed_dict={x: xs, y: ys, train_flag: 0})
 
+        total_correct += _sum_correct
+        if ((jj+1) % 1000 == 0):
+            print ('%d/%d' % (jj+1, 10000))
+  
+    print ("acc: " + str(total_correct * 1.0 / 10000))
+'''
+####################################
 
 
 
