@@ -37,7 +37,9 @@ train_flag = tf.placeholder(tf.int32, ())
 ####################################
 
 # TODO: can train with batches, just pick an idx they can all go down.
-# sum along batch index...
+  # sum along batch index...
+
+# TODO: learn how entropy works bc we have no idea what we are doing.
 
 def batch_norm(x, f):
     gamma = tf.Variable(np.ones(shape=f), dtype=tf.float32)
