@@ -100,7 +100,7 @@ def route_block_pred(x, nexpert, route, expert):
     train_out = tf.switch_case(branch_index=train_idx, branch_fns=branch_fns)
     test_out = tf.switch_case(branch_index=test_idx, branch_fns=branch_fns)
 
-    return train_out, test_out, pi, train_idx, test_idx
+    return train_out, test_out, train_idx, test_idx
 
 def route_block(x, nexpert, nidx, route, expert):
     blocks = [x]
@@ -112,8 +112,12 @@ def route_block(x, nexpert, nidx, route, expert):
     dense = tf.squeeze(dense_block(flat, [f, nidx * nexpert]))
     route = tf.reshape(dense, [nidx, nexpert])
 
-    pi = tf.distributions.Categorical(logits=route)
-    train_idx = tf.squeeze(pi.sample(1))
+    pis       = [None] * nidx
+    train_idx = [None] * nidx
+    for i in range(nidx):
+        pis[i] = tf.distributions.Categorical(logits=route[p])
+        train_idx[i] = tf.squeeze(pis[i].sample(1))
+
     test_idx = tf.cast(tf.argmax(route, axis=0), dtype=tf.int32)
 
     experts = []
@@ -139,15 +143,17 @@ def route_block(x, nexpert, nidx, route, expert):
     train_out = tf.concat(train_out, axis=3)
     test_out = tf.concat(test_out, axis=3)
 
-    return train_out, test_out, pi, train_idx, test_idx
+    entropy = 
+
+    return train_out, test_out, train_idx, test_idx
 
 ####################################
 
 x1 = x
-train_out1, test_out1, pi1, train_idx1, test_idx1 = route_block(x=x1, nexpert=20, nidx=4, route=[[3, 64, 2], [64, 64, 2], [64, 64, 2], [64, 64, 4]], expert=[[3, 64, 2], [64, 64, 1], [64, 64, 1], [64, 64, 1]])
+train_out1, test_out1, train_idx1, test_idx1 = route_block(x=x1, nexpert=20, nidx=4, route=[[3, 64, 2], [64, 64, 2], [64, 64, 2], [64, 64, 4]], expert=[[3, 64, 2], [64, 64, 1], [64, 64, 1], [64, 64, 1]])
 
 x2 = tf.switch_case(branch_index=train_flag, branch_fns={0: lambda: test_out1, 1: lambda: train_out1})
-train_out2, test_out2, pi2, train_idx2, test_idx2 = route_block_pred(x=x2, nexpert=20, route=[[256, 256, 1], [256, 256, 2], [256, 256, 2], [256, 256, 4]], expert=[[256, 256, 1], [256, 256, 2], [256, 256, 2], [256, 256, 4]])
+train_out2, test_out2, train_idx2, test_idx2 = route_block_pred(x=x2, nexpert=20, route=[[256, 256, 1], [256, 256, 2], [256, 256, 2], [256, 256, 4]], expert=[[256, 256, 1], [256, 256, 2], [256, 256, 2], [256, 256, 4]])
 
 ####################################
 
@@ -157,7 +163,7 @@ sum_correct = tf.reduce_sum(tf.cast(correct, tf.float32))
 entropy_loss1 = -tf.reduce_mean(pi1.entropy())
 entropy_loss2 = -tf.reduce_mean(pi2.entropy())
 class_loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=train_out2)
-loss = (1. * class_loss) + (5. * entropy_loss1) + (0.5 * entropy_loss2)
+loss = (1. * class_loss) + (0.005 * entropy_loss1) + (0.001 * entropy_loss2)
 
 params = tf.trainable_variables()
 grads = tf.gradients(loss, params)
@@ -180,7 +186,7 @@ for ii in range(epochs):
     for jj in range(0, 50000, batch_size):
         xs = np.reshape(x_train[jj], (1, 32, 32, 3))
         ys = np.reshape(y_train[jj], (1, 100))
-        [_, out1, out2, i1, i2] = sess.run([train, train_out1, train_out2, train_idx1, train_idx2], feed_dict={x: xs, y: ys, train_flag: 1}) 
+        [_, out1, out2, i1, i2, l1, l2, l3] = sess.run([train, train_out1, train_out2, train_idx1, train_idx2, class_loss, entropy_loss1, entropy_loss2], feed_dict={x: xs, y: ys, train_flag: 1}) 
 
         idx2[i2] += 1 
         for i in i1:
@@ -189,6 +195,7 @@ for ii in range(epochs):
         if ((jj+1) % 1000 == 0):
             print ('%d/%d' % (jj+1, 50000))    
             print (idx1, idx2)
+            print (l1, l2, l3)
             # print (np.shape(out1), np.shape(out2), i1, i2)
 
     idx1 = [0] * 20
