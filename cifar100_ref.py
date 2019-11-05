@@ -35,46 +35,46 @@ y = tf.placeholder(tf.float32, [None, 100])
 
 ####################################
 
-def batch_norm(x, f, name):
-    gamma = tf.Variable(np.ones(shape=f), dtype=tf.float32, name=name+'_gamma')
-    beta = tf.Variable(np.zeros(shape=f), dtype=tf.float32, name=name+'_beta')
+def batch_norm(x, f):
+    gamma = tf.Variable(np.ones(shape=f), dtype=tf.float32)
+    beta = tf.Variable(np.zeros(shape=f), dtype=tf.float32)
     mean = tf.reduce_mean(x, axis=[0,1,2])
     _, var = tf.nn.moments(x - mean, axes=[0,1,2])
     bn = tf.nn.batch_normalization(x=x, mean=mean, variance=var, offset=beta, scale=gamma, variance_epsilon=1e-3)
     return bn
 
-def block(x, f1, f2, p, name):
-    filters = tf.Variable(init_filters(size=[3,3,f1,f2], init='alexnet'), dtype=tf.float32, name=name+'_conv')
+def block(x, f1, f2, p):
+    filters = tf.Variable(init_filters(size=[3,3,f1,f2], init='alexnet'), dtype=tf.float32)
 
     conv = tf.nn.conv2d(x, filters, [1,1,1,1], 'SAME')
-    bn   = batch_norm(conv, f2, name+'_bn1')
+    bn   = batch_norm(conv, f2)
     relu = tf.nn.relu(bn)
 
     pool = tf.nn.avg_pool(relu, ksize=[1,p,p,1], strides=[1,p,p,1], padding='SAME')
 
     return pool
 
-def dense(x, size, name):
+def dense(x, size):
     input_size, output_size = size
-    w = tf.Variable(init_matrix(size=size, init='alexnet'), dtype=tf.float32, name=name)
-    b  = tf.Variable(np.zeros(shape=output_size), dtype=tf.float32, name=name+'_bias')
+    w = tf.Variable(init_matrix(size=size, init='alexnet'), dtype=tf.float32)
+    b  = tf.Variable(np.zeros(shape=output_size), dtype=tf.float32)
     fc = tf.matmul(x, w) + b
     return fc
 
 ####################################
 
-block1 = block(x,        3, 64,  1, 'block1') # 32 -> 32
-block2 = block(block1,  64, 128, 2, 'block2') # 32 -> 16
+block1 = block(x,        3, 64,  1) # 32 -> 32
+block2 = block(block1,  64, 128, 2) # 32 -> 16
 
-block3 = block(block2, 128, 256, 1, 'block3') # 16 -> 16
-block4 = block(block3, 256, 256, 2, 'block4') # 16 ->  8
+block3 = block(block2, 128, 256, 1) # 16 -> 16
+block4 = block(block3, 256, 256, 2) # 16 ->  8
 
-block5 = block(block4, 256, 512, 1, 'block5') #  8 ->  8
-block6 = block(block5, 512, 512, 2, 'block6') #  8 ->  4
+block5 = block(block4, 256, 512, 1) #  8 ->  8
+block6 = block(block5, 512, 512, 2) #  8 ->  4
 
 pool   = tf.nn.avg_pool(block6, ksize=[1,4,4,1], strides=[1,4,4,1], padding='SAME')  # 4 -> 1
 flat   = tf.reshape(pool, [batch_size, 512])
-out    = dense(flat, [512, 100], 'fc1')
+out    = dense(flat, [512, 100])
 
 ####################################
 
