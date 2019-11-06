@@ -1,7 +1,7 @@
 
 import os
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]='0'
+os.environ["CUDA_VISIBLE_DEVICES"]='4'
 
 ####################################
 
@@ -38,21 +38,35 @@ y = tf.placeholder(tf.float32, [None, 100])
 def batch_norm(x, f):
     gamma = tf.Variable(np.ones(shape=f), dtype=tf.float32)
     beta = tf.Variable(np.zeros(shape=f), dtype=tf.float32)
-    mean = tf.reduce_mean(x, axis=[0,1,2])
-    _, var = tf.nn.moments(x - mean, axes=[0,1,2])
-    bn = tf.nn.batch_normalization(x=x, mean=mean, variance=var, offset=beta, scale=gamma, variance_epsilon=1e-3)
-    return bn
+
+    mean = tf.Variable(np.zeros(shape=f), trainable=False, dtype=tf.float32)
+    var = tf.Variable(np.zeros(shape=f), trainable=False, dtype=tf.float32)
+    count = tf.Variable(0, trainable=False, dtype=tf.int64)
+
+    next_mean = tf.reduce_mean(x, axis=[0,1,2])
+    _, next_var = tf.nn.moments(x - next_mean, axes=[0,1,2])
+
+    new_count = count + 1
+    new_mean = ((tf.cast(count, tf.float32) * mean) + next_mean) / tf.cast(new_count, tf.float32)
+    new_var = ((tf.cast(count, tf.float32) * var) + next_var) / tf.cast(new_count, tf.float32)
+
+    update_mean = mean.assign(new_mean)
+    update_var = var.assign(new_var)
+    update_count = count.assign(new_count)
+
+    bn = tf.nn.batch_normalization(x=x, mean=new_mean, variance=new_var, offset=beta, scale=gamma, variance_epsilon=1e-3)
+    return bn, (update_mean, update_var, update_count)
 
 def block(x, f1, f2, p):
     filters = tf.Variable(init_filters(size=[3,3,f1,f2], init='alexnet'), dtype=tf.float32)
 
     conv = tf.nn.conv2d(x, filters, [1,1,1,1], 'SAME')
-    bn   = batch_norm(conv, f2)
+    bn, update = batch_norm(conv, f2)
     relu = tf.nn.relu(bn)
 
     pool = tf.nn.avg_pool(relu, ksize=[1,p,p,1], strides=[1,p,p,1], padding='SAME')
 
-    return pool
+    return pool, update
 
 def dense(x, size):
     input_size, output_size = size
@@ -63,18 +77,22 @@ def dense(x, size):
 
 ####################################
 
-block1 = block(x,        3, 64,  1) # 32 -> 32
-block2 = block(block1,  64, 128, 2) # 32 -> 16
+block1, update1 = block(x,        3, 64,  1) # 32 -> 32
+block2, update2 = block(block1,  64, 128, 2) # 32 -> 16
 
-block3 = block(block2, 128, 256, 1) # 16 -> 16
-block4 = block(block3, 256, 256, 2) # 16 ->  8
+block3, update3 = block(block2, 128, 256, 1) # 16 -> 16
+block4, update4 = block(block3, 256, 256, 2) # 16 ->  8
 
-block5 = block(block4, 256, 512, 1) #  8 ->  8
-block6 = block(block5, 512, 512, 2) #  8 ->  4
+block5, update5 = block(block4, 256, 512, 1) #  8 ->  8
+block6, update6 = block(block5, 512, 512, 2) #  8 ->  4
 
 pool   = tf.nn.avg_pool(block6, ksize=[1,4,4,1], strides=[1,4,4,1], padding='SAME')  # 4 -> 1
 flat   = tf.reshape(pool, [batch_size, 512])
 out    = dense(flat, [512, 100])
+
+# this only works with variables...
+# ema = tf.train.ExponentialMovingAverage(decay=0.9999)
+# avg = ema.apply([block1, block2])
 
 ####################################
 
@@ -103,8 +121,8 @@ for ii in range(epochs):
         e = jj + batch_size
         xs = np.reshape(x_train[s:e], (batch_size,32,32,3))
         ys = np.reshape(y_train[s:e], (batch_size,100))
-        sess.run([train], feed_dict={x: xs, y: ys})
-        
+        sess.run([train, update1, update2, update3, update4, update5, update6], feed_dict={x: xs, y: ys})
+
     total_correct = 0
 
     for jj in range(0, 10000, batch_size):
