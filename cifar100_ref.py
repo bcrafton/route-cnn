@@ -101,8 +101,8 @@ for ii in range(epochs):
     for jj in range(0, 50000, batch_size):
         s = jj
         e = jj + batch_size
-        xs = x_train[s:e]
-        ys = y_train[s:e]
+        xs = np.reshape(x_train[s:e], (batch_size,32,32,3))
+        ys = np.reshape(y_train[s:e], (batch_size,100))
         sess.run([train], feed_dict={x: xs, y: ys})
         
     total_correct = 0
@@ -110,8 +110,8 @@ for ii in range(epochs):
     for jj in range(0, 10000, batch_size):
         s = jj
         e = jj + batch_size
-        xs = x_test[s:e]
-        ys = y_test[s:e]
+        xs = np.reshape(x_test[s:e], (batch_size,32,32,3))
+        ys = np.reshape(y_test[s:e], (batch_size,100))
         _sum_correct = sess.run(sum_correct, feed_dict={x: xs, y: ys})
         total_correct += _sum_correct
   
