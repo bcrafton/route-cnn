@@ -35,36 +35,53 @@ b = tf.placeholder(tf.int32, ())
 
 ####################################
 
-def batch_norm(x, f, train):
+'''
+def batch_norm(data, name):
+    shape_param = data.get_shape()[-1]
+
+    beta = tf.get_variable(name=name+'_beta', shape=shape_param, dtype=tf.float32, initializer=tf.constant_initializer(0.0, tf.float32))
+    gamma = tf.get_variable(name=name+'_gamma', shape=shape_param, dtype=tf.float32, initializer=tf.constant_initializer(1.0, tf.float32))
+
+    if FLAGS.train_mode:
+        mean_param, variance_param = tf.nn.moments(x=data, axes=[0, 1, 2], name=name+'_moments')
+        moving_mean = tf.get_variable(name=name+'_moving_mean', shape=shape_param, dtype=tf.float32, initializer=tf.constant_initializer(0.0, tf.float32), trainable=False)
+        moving_variance = tf.get_variable(name=name+'_moving_variance', shape=shape_param, dtype=tf.float32, initializer=tf.constant_initializer(1.0, tf.float32), trainable=False)
+
+        mean = moving_averages.assign_moving_average(variable=moving_mean, value=mean_param, decay=0.9)
+        variance = moving_averages.assign_moving_average(variable=moving_variance, value=variance_param, decay=0.9)
+    else:
+        mean = tf.get_variable(name=name+'_moving_mean', shape=shape_param, dtype=tf.float32, initializer=tf.constant_initializer(0.0, tf.float32), trainable=False)
+        variance = tf.get_variable(name=name+'_moving_variance', shape=shape_param, dtype=tf.float32, initializer=tf.constant_initializer(1.0, tf.float32), trainable=False)
+        tf.summary.scalar(mean.op.name, mean)
+        tf.summary.scalar(variance.op.name, variance)
+
+    b_norm = tf.nn.batch_normalization(x=data, mean=mean, variance=variance, offset=beta, scale=gamma, variance_epsilon=0.001, name=name)
+    return b_norm 
+'''
+
+def batch_norm(x, f, train, momentum=0.9):
     gamma = tf.Variable(np.ones(shape=f), dtype=tf.float32)
     beta = tf.Variable(np.zeros(shape=f), dtype=tf.float32)
-
     mean = tf.Variable(np.zeros(shape=f), trainable=False, dtype=tf.float32)
-    var = tf.Variable(np.zeros(shape=f), trainable=False, dtype=tf.float32)
-    count = tf.Variable(0, trainable=False, dtype=tf.int64)
+    var = tf.Variable(np.ones(shape=f), trainable=False, dtype=tf.float32)
 
     next_mean = tf.reduce_mean(x, axis=[0,1,2])
     _, next_var = tf.nn.moments(x - next_mean, axes=[0,1,2])
 
-    new_count = count + 1
-    new_mean = ((tf.cast(count, tf.float32) * mean) + next_mean) / tf.cast(new_count, tf.float32)
-    new_var = ((tf.cast(count, tf.float32) * var) + next_var) / tf.cast(new_count, tf.float32)
-
-    # new_var = tf.Print(new_var, [count], message='', summarize=1000)
+    new_mean = momentum * mean + (1. - momentum) * next_mean
+    new_var = momentum * var + (1. - momentum) * next_var
 
     def batch_norm_train():
         update_mean = mean.assign(new_mean)
         update_var = var.assign(new_var)
-        update_count = count.assign(new_count)
         bn = tf.nn.batch_normalization(x=x, mean=new_mean, variance=new_var, offset=beta, scale=gamma, variance_epsilon=1e-3)
-        return bn, (update_mean, update_var, update_count)
+        return bn, (update_mean, update_var)
 
     def batch_norm_inference():
-        update_mean = mean.assign(tf.zeros_like(new_mean))
-        update_var = var.assign(tf.zeros_like(new_var))
-        update_count = count.assign(0)
+        update_mean = mean.assign(mean)
+        update_var = var.assign(var)
         bn = tf.nn.batch_normalization(x=x, mean=next_mean, variance=next_var, offset=beta, scale=gamma, variance_epsilon=1e-3)
-        return bn, (update_mean, update_var, update_count)
+        return bn, (update_mean, update_var)
 
     return tf.cond(train, lambda: batch_norm_train(), lambda: batch_norm_inference())
 
