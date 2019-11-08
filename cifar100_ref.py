@@ -60,16 +60,28 @@ def batch_norm(data, name):
 '''
 
 def batch_norm(x, f, train, momentum=0.9):
+
+    # definitely is the init for mean and var I think.
+    # or atleast that is having negative effect.
+    # well actually tbf the values end up being pretty similar.
+
     gamma = tf.Variable(np.ones(shape=f), dtype=tf.float32)
     beta = tf.Variable(np.zeros(shape=f), dtype=tf.float32)
     mean = tf.Variable(np.zeros(shape=f), trainable=False, dtype=tf.float32)
     var = tf.Variable(np.ones(shape=f), trainable=False, dtype=tf.float32)
 
-    next_mean = tf.reduce_mean(x, axis=[0,1,2])
-    _, next_var = tf.nn.moments(x - next_mean, axes=[0,1,2])
+    # next_mean = tf.reduce_mean(x, axis=[0,1,2])
+    # _, next_var = tf.nn.moments(x - next_mean, axes=[0,1,2])
 
+    next_mean, next_var = tf.nn.moments(x, axes=[0,1,2])
+
+    # new_mean = next_mean 
+    # new_var = next_var 
     new_mean = momentum * mean + (1. - momentum) * next_mean
     new_var = momentum * var + (1. - momentum) * next_var
+
+    # new_var = tf.Print(new_var, [tf.reduce_mean(new_var), tf.reduce_mean(next_var)], message='', summarize=1000)
+    # next_var = tf.Print(next_var, [tf.reduce_mean(new_var), tf.reduce_mean(next_var)], message='', summarize=1000)
 
     def batch_norm_train():
         update_mean = mean.assign(new_mean)
